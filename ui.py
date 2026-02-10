@@ -1,27 +1,37 @@
+from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget,
     QStackedLayout,
     QGridLayout,
     QListWidget,
-    QListWidgetItem,
     QLabel,
+    QLineEdit,
+    QFormLayout,
+    QHBoxLayout,
+    QVBoxLayout,
+    QToolButton,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
 )
-from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtCore import Qt
 
 
 class MainWindow(QWidget):
     def __init__(self, model, ts):
+        self.model = model
         self.ts = ts
         super().__init__()
         self.setWindowTitle("Gelding")
-        palette = Palette()
-        self.setPalette(palette)
-        font = Font()
-        self.mainArea = MonthsWidget(model, ts, palette, font)
-        self.arena = ArenaLayout(ts, palette, font)
-        self.toolView = ToolViewWidget(self.arena, palette, font)
+        self.mainArea = QScrollArea()
+        self.mainArea.setWidgetResizable(True)
+        self.set_mainArea()
+        self.arena = ArenaLayout(ts, self)
+        self.toolView = ToolViewWidget(self.arena)
         self.setLayout(Layout(self.mainArea, self.toolView, self.arena))
+
+    def set_mainArea(self):
+        self.mainArea.setWidget(MonthsWidget(self.model, self.ts))
 
     def closeEvent(self, event):
         self.ts.exit(event)
@@ -40,11 +50,9 @@ class Layout(QGridLayout):
 
 
 class ToolViewWidget(QListWidget):
-    def __init__(self, arena, palette, font):
+    def __init__(self, arena):
         self.arena = arena
         super().__init__()
-        self.setPalette(palette)
-        self.setFont(font)
         for tool in self.arena.tool_dict:
             self.addItem(tool)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -59,12 +67,16 @@ class ToolViewWidget(QListWidget):
 
 
 class ArenaLayout(QStackedLayout):
-    def __init__(self, ts, palette, font):
+    def __init__(
+        self,
+        ts,
+        main_window,
+    ):
         self.ts = ts
         super().__init__()
         self.insertWidget(0, QWidget())
-        self.insertWidget(1, UseMe(palette, font))
-        self.tool_dict = {"UseMe": 1}
+        self.insertWidget(1, AddTrans(ts, main_window))
+        self.tool_dict = {"Add Transaction": 1}
 
     def clear(self):
         self.setCurrentIndex(0)
@@ -73,47 +85,105 @@ class ArenaLayout(QStackedLayout):
         self.setCurrentIndex(self.tool_dict[label])
 
 
-class UseMe(QListWidget):
-    def __init__(self, palette, font):
+class AddTrans(QWidget):
+    def __init__(self, ts, main_window):
         super().__init__()
-        self.setPalette(palette)
-        self.setFont(font)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.addItem("UseMe")
+        tool_layout = QFormLayout(self)
+        tool_layout.addWidget(
+            QLabel("Add Transaction", alignment=Qt.AlignmentFlag.AlignTop)
+        )
+        name_edit = QLineEdit()
+        q_edit = QLineEdit()
+        month_name_edit = QLineEdit()
+        save_button = QPushButton("Save")
+
+        def save():
+            name = name_edit.text()[:]
+            name_edit.clear()
+            q = int(q_edit.text())
+            q_edit.clear()
+            month_name = month_name_edit.text()[:]
+            month_name_edit.clear()
+            ts.create_transaction(name, q, month_name, main_window)
+
+        tool_layout.addRow("name", name_edit)
+        tool_layout.addRow("quantity", q_edit)
+        tool_layout.addRow("month_name", month_name_edit)
+        tool_layout.addRow(save_button)
+        save_button.clicked.connect(save)
 
 
-class MonthsWidget(QListWidget):
-    def __init__(self, model, ts, palette, font):
+class MonthsWidget(QWidget):
+    def __init__(self, model, ts):
         self.model = model
         self.ts = ts
         super().__init__()
-        for m in model.months:
-            self.addItem(MonthsItem(model, m))
-        self.setPalette(palette)
-        self.setFont(font)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        for m in self.model.months:
+            layout.addWidget(MonthItem(self.model, m, self))
+        layout.addStretch()
+
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
 
-class MonthsItem(QListWidgetItem):
-    def __init__(self, model, m):
-        super().__init__(m.name)
-        if m.order < model.misc["current_month"]:
-            self.setBackground(QColor("#aabd8c"))
-            self.setForeground(QColor("#5fab70"))
-            self.setFlags(Qt.ItemFlag.NoItemFlags)
+class MonthItem(QWidget):
+    def __init__(self, model, m, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        self.header = QPushButton()
+        self.header.setText(m.name)
+        self.header.setCheckable(True)
+        self.header.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        layout.addWidget(self.header)
+        layout.setSpacing(0)
+
+        self.content = QWidget()
+        content_layout = QVBoxLayout(self.content)
+        content_layout.setSpacing(0)
+        if m.order < model.current_month:
+            self.content.setVisible(False)
+        if m.order == model.current_month:
+            content_layout.addWidget(
+                QLabel(
+                    f"Current balance: €{model.current_balance / 100}",
+                    alignment=Qt.AlignmentFlag.AlignRight,
+                    indent=9,
+                )
+            )
+        if m.order >= model.current_month:
+            self.header.setChecked(True)
+
+        for t in m.trans_links:
+            self.trans = QWidget()
+            trans_layout = QHBoxLayout(self.trans)
+            trans_layout.addWidget(QLabel(f"{t.name}:"))
+            trans_layout.addWidget(
+                QLabel(f"\t€{t.q / 100}"), alignment=Qt.AlignmentFlag.AlignRight
+            )
+            content_layout.addWidget(self.trans)
+        self.footer = QWidget()
+        footer_layout = QHBoxLayout(self.footer)
+        footer_layout.addWidget(QLabel())
+        footer_layout.addWidget(
+            QLabel(
+                f"=================\n€{m.get_total() / 100}",
+                alignment=Qt.AlignmentFlag.AlignRight,
+            )
+        )
+        content_layout.addWidget(self.footer)
+        layout.addWidget(self.content)
+
+        self.header.clicked.connect(self.on_toggled)
+
+    def on_toggled(self, expanded: bool):
+        self.content.setVisible(expanded)
 
 
-class Font(QFont):
-    def __init__(self):
-        super().__init__()
-        self.setFamily("Avantgarde")
-        self.setPointSize(20)
-
-
-class Palette(QPalette):
-    def __init__(self):
-        super().__init__()
-        self.setColor(QPalette.ColorRole.Window, QColor("#f9b9b7"))
-        self.setColor(QPalette.ColorRole.Base, QColor("#5fab70"))
-        self.setColor(QPalette.ColorRole.Text, QColor("#053c5e"))
-        self.setColor(QPalette.ColorRole.Highlight, QColor("#8d86c9"))
+# class Palette(QPalette):
+#     def __init__(self):
+#         super().__init__()
+#         self.setColor(QPalette.ColorRole.Base, QColor("#5fab70"))
+#         self.setColor(QPalette.ColorRole.Text, QColor("#053c5e"))

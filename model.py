@@ -3,57 +3,60 @@ import uuid
 
 class Model:
     def __init__(self, db):
-        # self.months, self.ties, self.transactions, self.misc = db.load()
-        # using test data for now:
-        self.months = [
-            Month(self.gen_uid(), 1, "June"),
-            Month(self.gen_uid(), 2, "July"),
-            Month(self.gen_uid(), 3, "August"),
-            Month(self.gen_uid(), 4, "September"),
-            Month(self.gen_uid(), 5, "October"),
-            Month(self.gen_uid(), 6, "November"),
-        ]
-        self.transactions = [
-            Trans(self.gen_uid(), "Freddy D", 500_00),
-            Trans(self.gen_uid(), "Pizza", 10_00),
-            Trans(self.gen_uid(), "Webflyx", 5_00),
-        ]
-
-        self.ties = [
-            Tie(self.months[2], self.transactions[0]),
-            Tie(self.months[2], self.transactions[1]),
-            Tie(self.months[2], self.transactions[2]),
-            Tie(self.months[3], self.transactions[2]),
-            Tie(self.months[4], self.transactions[2]),
-            Tie(self.months[5], self.transactions[2]),
-            Tie(self.months[2], self.transactions[1]),
-        ]
-        self.misc = {
-            "current_month": 3,
-            "current_balance": 839_426_712,
-        }
+        self.months = []
+        self.transactions = []
+        db.load(self)
 
     def gen_uid(self):
         return uuid.uuid1().hex
 
+    def add_link_month_and_trans(self, month, trans):
+        month.trans_links.add(trans)
+        trans.month_links.add(month)
+
+    def rem_link_month_and_trans(self, month, trans):
+        month.trans_links.remove(trans)
+        trans.month_links.remove(month)
+
+    def get_month_from_name(self, name):
+        for month in self.months:
+            if month.name == name:
+                return month
+
+    def get_month_from_id(self, id):
+        for month in self.months:
+            if month.id == id:
+                return month
+
+    def get_trans_from_id(self, id):
+        for trans in self.transactions:
+            if trans.id == id:
+                return trans
+
 
 class Month:
-    def __init__(self, id, order, name):
+    def __init__(self, model, id, name, order):
+        self.model = model
         self.id = id
-        self.order = order
         self.name = name
+        self.order = order
+        self.trans_links = set()
 
-    def add_trans(self, trans):
-        if not self.trans:
-            self.trans = trans
-        else:
-            self.trans.append(trans)
+    def set_balance(self, q):
+        self.balance = q
 
+    def get_balance(self):
+        if hasattr(self, "balance"):
+            return self.balance
+        if self.order == self.model.current_month:
+            return self.model.current_balance
+        return 0
 
-class Tie:
-    def __init__(self, month, trans):
-        self.month = month
-        self.trans = trans
+    def get_total(self):
+        total = self.get_balance()
+        for t in self.trans_links:
+            total += t.q
+        return total
 
 
 class Trans:
@@ -61,3 +64,4 @@ class Trans:
         self.id = id
         self.name = name
         self.q = q
+        self.month_links = set()

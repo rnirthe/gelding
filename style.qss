@@ -1,0 +1,17 @@
+* {
+  font : 20px;
+  font-family: "Avantgarde"
+}
+QWidget {
+    background-color: "#f9b9b7"
+  }
+QStackedLayout,
+QListWidget,
+QScrollArea {
+    background-color: "#aabd8c"
+  }
+
+QListWidget {
+    selection-background-color: "#8d86c9"
+  }
+
