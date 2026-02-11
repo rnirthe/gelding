@@ -53,12 +53,12 @@ class DataBase:
 
     def __upd_misc(self, model):
         self.cur.execute(
-            "INSERT OR IGNORE INTO misc (name, value) VALUES (?, ?)",
-            ("current_balance", model.current_balance),
+            "UPDATE misc SET value = ? WHERE name = 'current_balance'",
+            (model.current_balance,),
         )
         self.cur.execute(
-            "INSERT OR IGNORE INTO misc (name, value) VALUES (?, ?)",
-            ("current_month", model.current_month),
+            "UPDATE misc SET value = ? WHERE name = 'current_month'",
+            (model.current_month,),
         )
         # remove removed misc too
         # change changed misc too

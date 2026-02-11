@@ -3,6 +3,7 @@ import uuid
 
 class Model:
     def __init__(self, db):
+        self.db = db
         self.months = []
         self.transactions = []
         db.load(self)
@@ -32,6 +33,11 @@ class Model:
         for trans in self.transactions:
             if trans.id == id:
                 return trans
+
+    def save_and_close(self, event):
+        self.db.save(self)
+        self.db.close()
+        event.accept()
 
 
 class Month:

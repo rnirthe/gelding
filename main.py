@@ -13,7 +13,7 @@ if __name__ == "__main__":
     app.setStyleSheet
     db = DataBase()
     model = Model(db)
-    ts = ToolSet(db, model)
-    main_w = MainWindow(model, ts)
+    ts = ToolSet(model)
+    main_w = MainWindow(ts)
     main_w.show()
     sys.exit(app.exec())

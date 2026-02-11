@@ -1,4 +1,4 @@
-from pathlib import Path
+from PySide6.QtGui import QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QWidget,
     QStackedLayout,
@@ -9,29 +9,30 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QVBoxLayout,
-    QToolButton,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QRegularExpression, Qt, Signal, QObject
+
+
+class Signals(QObject):
+    upd_transactions_signal = Signal()
+
+
+signals = Signals()
 
 
 class MainWindow(QWidget):
-    def __init__(self, model, ts):
-        self.model = model
+    def __init__(self, ts):
         self.ts = ts
         super().__init__()
         self.setWindowTitle("Gelding")
         self.mainArea = QScrollArea()
         self.mainArea.setWidgetResizable(True)
-        self.set_mainArea()
-        self.arena = ArenaLayout(ts, self)
+        self.mainArea.setWidget(MonthsWidget(self.ts))
+        self.arena = ArenaLayout(self.ts)
         self.toolView = ToolViewWidget(self.arena)
         self.setLayout(Layout(self.mainArea, self.toolView, self.arena))
-
-    def set_mainArea(self):
-        self.mainArea.setWidget(MonthsWidget(self.model, self.ts))
 
     def closeEvent(self, event):
         self.ts.exit(event)
@@ -70,12 +71,11 @@ class ArenaLayout(QStackedLayout):
     def __init__(
         self,
         ts,
-        main_window,
     ):
         self.ts = ts
         super().__init__()
         self.insertWidget(0, QWidget())
-        self.insertWidget(1, AddTrans(ts, main_window))
+        self.insertWidget(1, AddTrans(ts))
         self.tool_dict = {"Add Transaction": 1}
 
     def clear(self):
@@ -86,104 +86,148 @@ class ArenaLayout(QStackedLayout):
 
 
 class AddTrans(QWidget):
-    def __init__(self, ts, main_window):
+    def __init__(self, ts):
+        self.ts = ts
         super().__init__()
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tool_layout = QFormLayout(self)
         tool_layout.addWidget(
             QLabel("Add Transaction", alignment=Qt.AlignmentFlag.AlignTop)
         )
-        name_edit = QLineEdit()
-        q_edit = QLineEdit()
-        month_name_edit = QLineEdit()
+        self.name_edit = QLineEdit()
+        self.q_edit = QLineEdit()
+        self.month_name_edit = QLineEdit()
         save_button = QPushButton("Save")
 
-        def save():
-            name = name_edit.text()[:]
-            name_edit.clear()
-            q = int(q_edit.text())
-            q_edit.clear()
-            month_name = month_name_edit.text()[:]
-            month_name_edit.clear()
-            ts.create_transaction(name, q, month_name, main_window)
-
-        tool_layout.addRow("name", name_edit)
-        tool_layout.addRow("quantity", q_edit)
-        tool_layout.addRow("month_name", month_name_edit)
+        tool_layout.addRow("name", self.name_edit)
+        tool_layout.addRow("quantity", self.q_edit)
+        tool_layout.addRow("month_name", self.month_name_edit)
         tool_layout.addRow(save_button)
-        save_button.clicked.connect(save)
+        save_button.clicked.connect(self.save)
+
+    def save(self):
+        name = self.name_edit.text()[:]
+        self.name_edit.clear()
+        q = int(self.q_edit.text())
+        self.q_edit.clear()
+        month_name = self.month_name_edit.text()[:]
+        self.month_name_edit.clear()
+        self.ts.create_transaction(name, q, month_name)
+        signals.upd_transactions_signal.emit()
 
 
 class MonthsWidget(QWidget):
-    def __init__(self, model, ts):
-        self.model = model
+    def __init__(self, ts):
         self.ts = ts
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        for m in self.model.months:
-            layout.addWidget(MonthItem(self.model, m, self))
+        for m in self.ts.get_all_months():
+            layout.addWidget(MonthItem(self.ts, m))
         layout.addStretch()
 
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
 
 class MonthItem(QWidget):
-    def __init__(self, model, m, parent=None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
+    def __init__(self, ts, month):
+        self.ts = ts
+        self.month = month
+        super().__init__()
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setSpacing(0)
+        self.init_header()
+        self.init_content()
+        signals.upd_transactions_signal.connect(self.upd_transactions)
+
+    def init_header(self):
         self.header = QPushButton()
-        self.header.setText(m.name)
+        self.header.setText(self.month.name)
         self.header.setCheckable(True)
         self.header.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        layout.addWidget(self.header)
-        layout.setSpacing(0)
+        self.header.clicked.connect(self.on_toggled)
+        if self.month.order >= self.ts.get_current_month():
+            self.header.setChecked(True)
+        self.main_layout.addWidget(self.header)
 
+    def init_content(self):
         self.content = QWidget()
-        content_layout = QVBoxLayout(self.content)
-        content_layout.setSpacing(0)
-        if m.order < model.current_month:
+        self.content_layout = QVBoxLayout(self.content)
+        self.content_layout.setSpacing(0)
+        if self.month.order < self.ts.get_current_month():
             self.content.setVisible(False)
-        if m.order == model.current_month:
-            content_layout.addWidget(
-                QLabel(
-                    f"Current balance: €{model.current_balance / 100}",
-                    alignment=Qt.AlignmentFlag.AlignRight,
-                    indent=9,
+        self.init_balance()
+        self.init_transactions()
+        self.init_footer()
+        self.main_layout.addWidget(self.content)
+
+    def init_balance(self):
+        if self.month.order == self.ts.get_current_month():
+            self.bal = QWidget()
+            bal_layout = QHBoxLayout(self.bal)
+            bal_layout.addWidget(QLabel("Current balance:"))
+            bal_layout.addWidget(QLabel("€"), alignment=Qt.AlignmentFlag.AlignRight)
+
+            bal_edit = QLineEdit(
+                f"{self.ts.get_current_balance() / 100}",
+                alignment=Qt.AlignmentFlag.AlignRight,
+            )
+            bal_edit.setValidator(
+                QRegularExpressionValidator(
+                    QRegularExpression("(?<!\\w)\\d*\\.\\d{0,2}(?!.)")
                 )
             )
-        if m.order >= model.current_month:
-            self.header.setChecked(True)
+            bal_edit.textEdited.connect(self.on_bal_change)
+            bal_edit.returnPressed.connect(self.on_return_pressed)
+            bal_edit.editingFinished.connect(bal_edit.clearFocus)
 
-        for t in m.trans_links:
+            bal_layout.addWidget(
+                bal_edit,
+                alignment=Qt.AlignmentFlag.AlignRight,
+            )
+            self.content_layout.addWidget(self.bal)
+
+    def init_transactions(self):
+        self.transactions = QWidget()
+        self.transactions_layout = QVBoxLayout(self.transactions)
+        for t in self.month.trans_links:
             self.trans = QWidget()
             trans_layout = QHBoxLayout(self.trans)
             trans_layout.addWidget(QLabel(f"{t.name}:"))
             trans_layout.addWidget(
-                QLabel(f"\t€{t.q / 100}"), alignment=Qt.AlignmentFlag.AlignRight
+                QLabel(f"€{t.q / 100}"), alignment=Qt.AlignmentFlag.AlignRight
             )
-            content_layout.addWidget(self.trans)
+            self.transactions_layout.addWidget(self.trans)
+        self.content_layout.addWidget(self.transactions)
+
+    def upd_transactions(self):
+        self.content_layout.removeWidget(self.transactions)
+        self.content_layout.removeWidget(self.footer)
+        self.init_transactions()
+        self.init_footer()
+
+    def init_footer(self):
         self.footer = QWidget()
-        footer_layout = QHBoxLayout(self.footer)
-        footer_layout.addWidget(QLabel())
-        footer_layout.addWidget(
+        self.footer_layout = QHBoxLayout(self.footer)
+        self.footer_layout.addWidget(
             QLabel(
-                f"=================\n€{m.get_total() / 100}",
+                f"=================\n€{self.month.get_total() / 100}",
                 alignment=Qt.AlignmentFlag.AlignRight,
             )
         )
-        content_layout.addWidget(self.footer)
-        layout.addWidget(self.content)
+        self.content_layout.addWidget(self.footer)
 
-        self.header.clicked.connect(self.on_toggled)
+    def upd_footer_label(self):
+        self.content_layout.removeWidget(self.footer)
+        self.init_footer()
 
     def on_toggled(self, expanded: bool):
         self.content.setVisible(expanded)
 
+    def on_bal_change(self, balance):
+        self.temp_bal = balance
 
-# class Palette(QPalette):
-#     def __init__(self):
-#         super().__init__()
-#         self.setColor(QPalette.ColorRole.Base, QColor("#5fab70"))
-#         self.setColor(QPalette.ColorRole.Text, QColor("#053c5e"))
+    def on_return_pressed(self):
+        self.ts.change_balance(int(float(self.temp_bal) * 100))
+        self.upd_footer_label()
