@@ -15,3 +15,29 @@ QListWidget {
     selection-background-color: "#8d86c9"
   }
 
+
+ShinyWidget {
+background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+stop: 0 #cac7e6, stop: 1 #bcb9df);
+border: 1px solid #afabd8;
+border-radius: 10px;
+padding: 10px;
+}
+ShinyWidget > QLabel, QLineEdit {
+    background: transparent;
+    border: none;
+    width: 70;
+  }
+
+
+
+/*
+class Palette(QPalette):
+    def __init__(self):
+        super().__init__()
+        self.setColor(QPalette.ColorRole.Base, QColor("#5fab70"))
+        self.setColor(QPalette.ColorRole.Text, QColor("#053c5e"))
+*/
+
+
+

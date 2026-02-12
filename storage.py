@@ -30,8 +30,6 @@ class DataBase:
                 "INSERT OR IGNORE INTO months (id, name, month_order) VALUES (?, ?, ?)",
                 (month.id, month.name, month.order),
             )
-        # remove removed months too
-        # change changed months too
 
     def __upd_ties(self, model):
         for month in model.months:
@@ -40,7 +38,12 @@ class DataBase:
                     "INSERT OR IGNORE INTO ties (month_id, trans_id) VALUES (?, ?) ",
                     (month.id, trans.id),
                 )
-        # remove removed ties too
+        if hasattr(model, "del_trans_ids"):
+            for trans_id in model.del_trans_ids:
+                self.cur.execute(
+                    "DELETE FROM ties WHERE trans_id = ?",
+                    (trans_id,),
+                )
 
     def __upd_transactions(self, model):
         for trans in model.transactions:
@@ -48,8 +51,12 @@ class DataBase:
                 "INSERT OR IGNORE INTO transactions (id, name, q) VALUES (?, ?, ?)",
                 (trans.id, trans.name, trans.q),
             )
-        # remove removed transactinos too
-        # change changed transactions too
+        if hasattr(model, "del_trans_ids"):
+            for trans_id in model.del_trans_ids:
+                self.cur.execute(
+                    "DELETE FROM transactions WHERE id = ?",
+                    (trans_id,),
+                )
 
     def __upd_misc(self, model):
         self.cur.execute(
@@ -60,15 +67,13 @@ class DataBase:
             "UPDATE misc SET value = ? WHERE name = 'current_month'",
             (model.current_month,),
         )
-        # remove removed misc too
-        # change changed misc too
 
     def __load_ties(self, model):
         self.cur.execute("SELECT month_id, trans_id FROM ties")
         for month_id, trans_id in self.cur.fetchall():
             month = model.get_month_from_id(month_id)
-            trans = model.get_trans_from_id(trans_id)
-            model.add_link_month_and_trans(month, trans)
+            transaction = model.get_transaction_from_id(trans_id)
+            model.add_link_month_and_trans(month, transaction)
 
     def __load_months(self, model):
         self.cur.execute("SELECT id, name, month_order FROM months")

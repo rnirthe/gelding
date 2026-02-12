@@ -17,6 +17,7 @@ from PySide6.QtCore import QRegularExpression, Qt, Signal, QObject
 
 class Signals(QObject):
     upd_transactions_signal = Signal()
+    upd_months_signal = Signal()
 
 
 signals = Signals()
@@ -76,7 +77,8 @@ class ArenaLayout(QStackedLayout):
         super().__init__()
         self.insertWidget(0, QWidget())
         self.insertWidget(1, AddTrans(ts))
-        self.tool_dict = {"Add Transaction": 1}
+        self.insertWidget(2, DelTrans(ts))
+        self.tool_dict = {"Add Transaction": 1, "Delete Transaction": 2}
 
     def clear(self):
         self.setCurrentIndex(0)
@@ -116,6 +118,28 @@ class AddTrans(QWidget):
         signals.upd_transactions_signal.emit()
 
 
+class DelTrans(QWidget):
+    def __init__(self, ts):
+        self.ts = ts
+        super().__init__()
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        tool_layout = QFormLayout(self)
+        tool_layout.addWidget(
+            QLabel("Delete Transaction", alignment=Qt.AlignmentFlag.AlignTop)
+        )
+        self.name_edit = QLineEdit()
+        delete_button = QPushButton("Delete")
+        tool_layout.addRow("name", self.name_edit)
+        tool_layout.addRow(delete_button)
+        delete_button.clicked.connect(self.delete)
+
+    def delete(self):
+        name = self.name_edit.text()[:]
+        self.name_edit.clear()
+        self.ts.delete_transaction(name)
+        signals.upd_transactions_signal.emit()
+
+
 class MonthsWidget(QWidget):
     def __init__(self, ts):
         self.ts = ts
@@ -126,7 +150,6 @@ class MonthsWidget(QWidget):
         for m in self.ts.get_all_months():
             layout.addWidget(MonthItem(self.ts, m))
         layout.addStretch()
-
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
 
@@ -140,6 +163,7 @@ class MonthItem(QWidget):
         self.init_header()
         self.init_content()
         signals.upd_transactions_signal.connect(self.upd_transactions)
+        signals.upd_months_signal.connect(self.upd_months)
 
     def init_header(self):
         self.header = QPushButton()
@@ -162,17 +186,25 @@ class MonthItem(QWidget):
         self.init_footer()
         self.main_layout.addWidget(self.content)
 
+    def upd_months(self):
+        self.main_layout.removeWidget(self.header)
+        self.main_layout.removeWidget(self.content)
+        self.init_header()
+        self.init_content()
+
     def init_balance(self):
         if self.month.order == self.ts.get_current_month():
-            self.bal = QWidget()
+            self.bal = ShinyWidget()
             bal_layout = QHBoxLayout(self.bal)
             bal_layout.addWidget(QLabel("Current balance:"))
+            bal_layout.addStretch()
             bal_layout.addWidget(QLabel("€"), alignment=Qt.AlignmentFlag.AlignRight)
 
             bal_edit = QLineEdit(
                 f"{self.ts.get_current_balance() / 100}",
                 alignment=Qt.AlignmentFlag.AlignRight,
             )
+            bal_edit.setMinimumWidth(1)
             bal_edit.setValidator(
                 QRegularExpressionValidator(
                     QRegularExpression("(?<!\\w)\\d*\\.\\d{0,2}(?!.)")
@@ -187,11 +219,23 @@ class MonthItem(QWidget):
                 alignment=Qt.AlignmentFlag.AlignRight,
             )
             self.content_layout.addWidget(self.bal)
+        if self.month.order > self.ts.get_current_month():
+            self.bal = ShinyWidget()
+            bal_layout = QHBoxLayout(self.bal)
+            bal_layout.addWidget(QLabel("Predicted balance:"))
+            bal_layout.addStretch()
+            bal_layout.addWidget(QLabel("€"), alignment=Qt.AlignmentFlag.AlignRight)
+            bal_layout.addWidget(
+                QLabel(f"{self.ts.get_total_prev(self.month) / 100}"),
+                alignment=Qt.AlignmentFlag.AlignRight,
+            )
+            self.content_layout.addWidget(self.bal)
 
     def init_transactions(self):
         self.transactions = QWidget()
         self.transactions_layout = QVBoxLayout(self.transactions)
-        for t in self.month.trans_links:
+        transactions = sorted(self.month.trans_links, key=lambda t: t.q, reverse=True)
+        for t in transactions:
             self.trans = QWidget()
             trans_layout = QHBoxLayout(self.trans)
             trans_layout.addWidget(QLabel(f"{t.name}:"))
@@ -230,4 +274,10 @@ class MonthItem(QWidget):
 
     def on_return_pressed(self):
         self.ts.change_balance(int(float(self.temp_bal) * 100))
-        self.upd_footer_label()
+        signals.upd_months_signal.emit()
+
+
+class ShinyWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setAttribute(Qt.WA_StyledBackground, True)
