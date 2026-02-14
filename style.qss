@@ -20,7 +20,7 @@ QScrollBar {
     width: 0px;
   }
 
-MonthItem  * {
+MonthItem  *  , MonthsWidget {
     background: transparent;
   }
 .MonthWidget {

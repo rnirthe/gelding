@@ -52,10 +52,10 @@ class DataBase:
                 (trans.id, trans.name, trans.q),
             )
         if hasattr(model, "del_trans_ids"):
-            for trans_id in model.del_trans_ids:
+            for transaction in model.del_transactions:
                 self.cur.execute(
                     "DELETE FROM transactions WHERE id = ?",
-                    (trans_id,),
+                    (transaction.id,),
                 )
 
     def __upd_misc(self, model):
@@ -73,7 +73,8 @@ class DataBase:
         for month_id, trans_id in self.cur.fetchall():
             month = model.get_month_from_id(month_id)
             transaction = model.get_transaction_from_id(trans_id)
-            model.add_link_month_and_trans(month, transaction)
+            if month and transaction:
+                model.add_link_month_and_trans(month, transaction)
 
     def __load_months(self, model):
         self.cur.execute("SELECT id, name, month_order FROM months")
@@ -93,6 +94,10 @@ class DataBase:
                     model.current_balance = int(value)
                 case "current_month":
                     model.current_month = int(value)
+        if not hasattr(model, "current_balance"):
+            model.current_balance = 0
+        if not hasattr(model, "current_month"):
+            model.current_month = -1
 
     def init_tables(self):
         self.cur.execute("""
