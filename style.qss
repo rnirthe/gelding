@@ -1,42 +1,101 @@
 * {
-  font : 20px;
-  font-family: "Avantgarde"
-}
-QWidget {
-    background-color: "#f9b9b7"
+    font : 20px;
+    font-family: "Avantgarde";
+    background: qradialgradient(cx: 0.5, cy: 0.5, radius: 0.5, fx: 0.5, fy: 0.5,
+    stop: 0 #fcdad9, stop: 1 #f9b9b7);
+    padding: 10px;
+    border: 0px;
+    border-radius: 5px;
   }
+
 QStackedLayout,
 QListWidget,
-QScrollArea {
-    background-color: "#aabd8c"
+QScrollArea,
+QScrollBar {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #bccba4, stop: 1 #aabd8c);
   }
 
-QListWidget {
-    selection-background-color: "#8d86c9"
+QScrollBar {
+    width: 0px;
   }
 
-
-ShinyWidget {
-background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-stop: 0 #cac7e6, stop: 1 #bcb9df);
-border: 1px solid #afabd8;
-border-radius: 10px;
-padding: 10px;
-}
-ShinyWidget > QLabel, QLineEdit {
+MonthItem  * {
     background: transparent;
-    border: none;
+  }
+.MonthWidget {
+  spacing: 0px;
+  }
+
+
+MonthItem > QWidget {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #ffc2d7, stop: 1 #ffadca);
+    border-top-left-radius: 0px;
+    border-top-right-radius: 0px;
+  }
+
+
+PastMonthHead:checked {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #e4e3f2, stop: 1 #d7d5ec);
+    border: 1px solid #cac7e6;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    padding: 15px;
+    margin: 0px;
+  }
+PastMonthHead:!checked {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #e4e3f2, stop: 1 #d7d5ec);
+    border: 1px solid #cac7e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 0px;
+  }
+FutureMonthHead:checked {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #cac7e6, stop: 1 #bcb9df);
+    border: 1px solid #afabd8;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    padding: 15px;
+    margin: 0px;
+  }
+FutureMonthHead:!checked {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #cac7e6, stop: 1 #bcb9df);
+    border: 1px solid #afabd8;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 0px;
+  }
+
+
+BalanceLine {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #ffadca, stop: 1 #ff99bd);
+    border: 1px solid #ff99bd;
+    border-radius: 0px;
+  }
+
+BalanceLine > QLabel, QLineEdit {
     width: 70;
   }
 
-
+TotalLine {
+    background-color: #ff99bd;
+  }
 
 /*
-class Palette(QPalette):
-    def __init__(self):
-        super().__init__()
-        self.setColor(QPalette.ColorRole.Base, QColor("#5fab70"))
-        self.setColor(QPalette.ColorRole.Text, QColor("#053c5e"))
+
+#8d86c9;
+"#5fab70"
+"#053c5e"
 */
 
 

@@ -3,7 +3,6 @@ from PySide6.QtWidgets import (
     QWidget,
     QStackedLayout,
     QGridLayout,
-    QListWidget,
     QLabel,
     QLineEdit,
     QFormLayout,
@@ -11,6 +10,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QPushButton,
     QScrollArea,
+    QButtonGroup,
+    QFrame,
 )
 from PySide6.QtCore import QRegularExpression, Qt, Signal, QObject
 
@@ -32,7 +33,7 @@ class MainWindow(QWidget):
         self.mainArea.setWidgetResizable(True)
         self.mainArea.setWidget(MonthsWidget(self.ts))
         self.arena = ArenaLayout(self.ts)
-        self.toolView = ToolViewWidget(self.arena)
+        self.toolView = ToolView(self.arena)
         self.setLayout(Layout(self.mainArea, self.toolView, self.arena))
 
     def closeEvent(self, event):
@@ -51,21 +52,29 @@ class Layout(QGridLayout):
         self.addLayout(arena, 1, 0)
 
 
-class ToolViewWidget(QListWidget):
+class ToolView(QWidget):
     def __init__(self, arena):
         self.arena = arena
         super().__init__()
-        for tool in self.arena.tool_dict:
-            self.addItem(tool)
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.itemSelectionChanged.connect(self.on_selection_change)
+        tool_layout = QVBoxLayout(self)
+        self.collection = ToolCollection(self.arena)
+        for button in self.collection.buttons():
+            tool_layout.addWidget(button)
 
-    def on_selection_change(self):
-        items = self.selectedItems()
-        if items != []:
-            self.arena.show_tool(items[0].text())
-        else:
-            self.arena.clear()
+
+class ToolCollection(QButtonGroup):
+    def __init__(self, arena):
+        self.arena = arena
+        super().__init__()
+        self.setExclusive(True)
+        for tool in self.arena.tool_dict:
+            button = QPushButton(tool)
+            button.setCheckable(True)
+            self.addButton(button)
+        self.buttonClicked.connect(self.on_click)
+
+    def on_click(self, button):
+        self.arena.show_tool(button.text())
 
 
 class ArenaLayout(QStackedLayout):
@@ -145,10 +154,10 @@ class MonthsWidget(QWidget):
         self.ts = ts
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
         for m in self.ts.get_all_months():
-            layout.addWidget(MonthItem(self.ts, m))
+            layout.addWidget(MonthItem(self.ts, m), alignment=Qt.AlignmentFlag.AlignTop)
         layout.addStretch()
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
@@ -164,15 +173,19 @@ class MonthItem(QWidget):
         self.init_content()
         signals.upd_transactions_signal.connect(self.upd_transactions)
         signals.upd_months_signal.connect(self.upd_months)
+        set_zero_spacing_recursive(self.main_layout)
 
     def init_header(self):
-        self.header = QPushButton()
+        if self.month.order < self.ts.get_current_month():
+            self.header = PastMonthHead()
+            self.header.setCheckable(True)
+        else:
+            self.header = FutureMonthHead()
+            self.header.setCheckable(True)
+            self.header.setChecked(True)
         self.header.setText(self.month.name)
-        self.header.setCheckable(True)
         self.header.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.header.clicked.connect(self.on_toggled)
-        if self.month.order >= self.ts.get_current_month():
-            self.header.setChecked(True)
         self.main_layout.addWidget(self.header)
 
     def init_content(self):
@@ -189,12 +202,14 @@ class MonthItem(QWidget):
     def upd_months(self):
         self.main_layout.removeWidget(self.header)
         self.main_layout.removeWidget(self.content)
+        self.header.deleteLater()
+        self.content.deleteLater()
         self.init_header()
         self.init_content()
 
     def init_balance(self):
         if self.month.order == self.ts.get_current_month():
-            self.bal = ShinyWidget()
+            self.bal = BalanceLine()
             bal_layout = QHBoxLayout(self.bal)
             bal_layout.addWidget(QLabel("Current balance:"))
             bal_layout.addStretch()
@@ -220,7 +235,7 @@ class MonthItem(QWidget):
             )
             self.content_layout.addWidget(self.bal)
         if self.month.order > self.ts.get_current_month():
-            self.bal = ShinyWidget()
+            self.bal = BalanceLine()
             bal_layout = QHBoxLayout(self.bal)
             bal_layout.addWidget(QLabel("Predicted balance:"))
             bal_layout.addStretch()
@@ -232,7 +247,7 @@ class MonthItem(QWidget):
             self.content_layout.addWidget(self.bal)
 
     def init_transactions(self):
-        self.transactions = QWidget()
+        self.transactions = TWidget()
         self.transactions_layout = QVBoxLayout(self.transactions)
         transactions = sorted(self.month.trans_links, key=lambda t: t.q, reverse=True)
         for t in transactions:
@@ -253,13 +268,17 @@ class MonthItem(QWidget):
 
     def init_footer(self):
         self.footer = QWidget()
-        self.footer_layout = QHBoxLayout(self.footer)
-        self.footer_layout.addWidget(
+        self.footer_layout = QVBoxLayout(self.footer)
+        self.footer_layout.addWidget(TotalLine())
+        self.total = QWidget()
+        self.total_layout = QHBoxLayout(self.total)
+        self.total_layout.addWidget(
             QLabel(
-                f"=================\n€{self.month.get_total() / 100}",
+                f"€{self.month.get_total() / 100}",
                 alignment=Qt.AlignmentFlag.AlignRight,
             )
         )
+        self.footer_layout.addWidget(self.total)
         self.content_layout.addWidget(self.footer)
 
     def upd_footer_label(self):
@@ -277,7 +296,42 @@ class MonthItem(QWidget):
         signals.upd_months_signal.emit()
 
 
-class ShinyWidget(QWidget):
+class BalanceLine(QWidget):
     def __init__(self):
         super().__init__()
         self.setAttribute(Qt.WA_StyledBackground, True)
+
+
+class TWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+
+class PastMonthHead(QPushButton):
+    def __init__(self):
+        super().__init__()
+
+
+class FutureMonthHead(QPushButton):
+    def __init__(self):
+        super().__init__()
+
+
+class TotalLine(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setFrameShape(QFrame.Shape.HLine)
+        self.setFixedHeight(2)
+
+
+def set_zero_spacing_recursive(layout):
+    layout.setSpacing(0)
+    layout.setContentsMargins(0, 0, 0, 0)
+    for i in range(layout.count()):
+        item = layout.itemAt(i)
+        if item.layout():
+            set_zero_spacing_recursive(item.layout())
+        elif item.widget():
+            widget = item.widget()
+            if widget.layout():
+                set_zero_spacing_recursive(widget.layout())
