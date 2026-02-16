@@ -1,6 +1,7 @@
-* {
-    font : 20px;
+QWidget {
+    font: 20px;
     font-family: "Avantgarde";
+    color: "#053c5e";
     background: qradialgradient(cx: 0.5, cy: 0.5, radius: 0.5, fx: 0.5, fy: 0.5,
     stop: 0 #fcdad9, stop: 1 #f9b9b7);
     padding: 10px;
@@ -8,10 +9,8 @@
     border-radius: 5px;
   }
 
-QStackedLayout,
 QListWidget,
-QScrollArea,
-QScrollBar {
+QScrollArea {
     background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
     stop: 0 #bccba4, stop: 1 #aabd8c);
   }
@@ -91,8 +90,18 @@ TotalLine {
     background-color: #ff99bd;
   }
 
-/*
 
+ToolButton:checked {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #fdedec, stop: 1 #fcdad9);
+  }
+
+WorkspaceItem {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+    stop: 0 #fcdad9, stop: 1 #f9b9b7);
+  }
+
+/*
 #8d86c9;
 "#5fab70"
 "#053c5e"

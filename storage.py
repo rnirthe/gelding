@@ -60,12 +60,20 @@ class DataBase:
 
     def __upd_misc(self, model):
         self.cur.execute(
+            "INSERT OR IGNORE INTO misc (name, value) VALUES ('current_balance', ?)",
+            (f"{model.current_balance}",),
+        )
+        self.cur.execute(
             "UPDATE misc SET value = ? WHERE name = 'current_balance'",
-            (model.current_balance,),
+            (f"{model.current_balance}",),
+        )
+        self.cur.execute(
+            "INSERT OR IGNORE INTO misc (name, value) VALUES ('current_month', ?)",
+            (f"{model.current_month}",),
         )
         self.cur.execute(
             "UPDATE misc SET value = ? WHERE name = 'current_month'",
-            (model.current_month,),
+            (f"{model.current_month}",),
         )
 
     def __load_ties(self, model):
@@ -91,13 +99,13 @@ class DataBase:
         for name, value in self.cur.fetchall():
             match name:
                 case "current_balance":
-                    model.current_balance = int(value)
+                    model.current_balance = float(value)
                 case "current_month":
                     model.current_month = int(value)
         if not hasattr(model, "current_balance"):
             model.current_balance = 0
         if not hasattr(model, "current_month"):
-            model.current_month = -1
+            model.current_month = 0
 
     def init_tables(self):
         self.cur.execute("""
@@ -111,7 +119,7 @@ class DataBase:
             CREATE TABLE IF NOT EXISTS transactions (
           id TEXT PRIMARY KEY NOT NULL,
           name TEXT NOT NULL UNIQUE,
-          q INTEGER
+          q FLOAT
         )
         """)
         self.cur.execute("""

@@ -6,7 +6,13 @@ class Model:
         self.db = db
         self.months = []
         self.transactions = []
+        self.current_balance = 0
+        self.current_month = 0
         db.load(self)
+
+    def set_current_balance(self, balance):
+        self.current_balance = float(balance)
+        print(self.current_balance)
 
     def gen_uid(self):
         return uuid.uuid1().hex
@@ -66,7 +72,7 @@ class Model:
 
     def get_transaction_from_id(self, id):
         for trans in self.transactions:
-            if trans.name == id:
+            if trans.id == id:
                 return trans
         return None
 
@@ -102,15 +108,17 @@ class Month:
     def get_balance(self):
         if self.order == self.model.current_month:
             return self.model.current_balance
-        if self.order > 1:
-            return self.get_prev_month().get_total()
+        if self.order > 0:
+            prev_month = self.get_prev_month()
+            if self != prev_month:
+                return prev_month.get_total()
         return 0
 
     def get_total(self):
         total = self.get_balance()
         for t in self.trans_links:
             total += t.q
-        return total
+        return round(total, 2)
 
     def get_prev_month(self):
         for month in self.model.months:
