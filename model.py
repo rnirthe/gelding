@@ -6,13 +6,10 @@ class Model:
         self.db = db
         self.months = []
         self.transactions = []
-        self.current_balance = 0
-        self.current_month = 0
         db.load(self)
 
     def set_current_balance(self, balance):
         self.current_balance = float(balance)
-        print(self.current_balance)
 
     def gen_uid(self):
         return uuid.uuid1().hex
